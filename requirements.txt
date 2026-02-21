@@ -1,0 +1,5 @@
+# GUI: tkinter is part of the Python standard library (no install needed)
+
+# Database
+SQLAlchemy>=2.0
+PyMySQL>=1.1

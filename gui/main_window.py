@@ -1,10 +1,11 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from decimal import Decimal
 from typing import Optional
 
 from models.transaction import Transaction, SAMPLE_TRANSACTIONS
 from gui.detail_panel import DetailPanel
+from services.csv_service import import_transactions, CSVImportError
 
 
 class MainWindow(tk.Tk):
@@ -152,7 +153,24 @@ class MainWindow(tk.Tk):
         messagebox.showinfo("Load from DB", "Not yet implemented.")
 
     def _on_import_file(self) -> None:
-        messagebox.showinfo("Import from File", "Not yet implemented.")
+        filepath = filedialog.askopenfilename(
+            title="Import CSV File",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        if not filepath:
+            return  # user cancelled
+
+        try:
+            transactions = import_transactions(filepath)
+        except CSVImportError as exc:
+            messagebox.showerror("Import Failed", str(exc))
+            return
+
+        self._populate_table(transactions)
+        messagebox.showinfo(
+            "Import Complete",
+            f"Imported {len(transactions)} transaction(s) from:\n{filepath}",
+        )
 
     # ------------------------------------------------------------------
     # Sorting

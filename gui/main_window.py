@@ -5,7 +5,9 @@ from typing import Optional
 
 from models.transaction import Transaction, SAMPLE_TRANSACTIONS
 from gui.detail_panel import DetailPanel
+from gui.db_config_dialog import DBConfigDialog
 from services.csv_service import import_transactions, CSVImportError
+from services.db_service import DBService, DBError
 
 
 class MainWindow(tk.Tk):
@@ -27,6 +29,9 @@ class MainWindow(tk.Tk):
         self.geometry("1100x620")
 
         self._transactions: dict[str, Transaction] = {}
+        self._selected_tx: Optional[Transaction] = None
+        self._db = DBService()
+        self._db_config: Optional[dict] = None  # last-used connection params
 
         self._apply_style()
         self._build_ui()
@@ -80,8 +85,12 @@ class MainWindow(tk.Tk):
             side=tk.LEFT, padx=(0, 8)
         )
         ttk.Button(btn_frame, text="Import from File", command=self._on_import_file).pack(
-            side=tk.LEFT
+            side=tk.LEFT, padx=(0, 8)
         )
+        self._btn_save = ttk.Button(
+            btn_frame, text="Save One", command=self._on_save_one, state=tk.DISABLED
+        )
+        self._btn_save.pack(side=tk.LEFT)
 
     def _build_table(self, parent: ttk.Frame) -> None:
         parent.columnconfigure(0, weight=1)
@@ -152,15 +161,58 @@ class MainWindow(tk.Tk):
     def _on_row_selected(self, event=None) -> None:
         selection = self._tree.selection()
         if not selection:
+            self._selected_tx = None
             self._detail_panel.clear()
+            self._btn_save.config(state=tk.DISABLED)
             return
         item_id = selection[0]
         txn = self._transactions.get(item_id)
         if txn:
+            self._selected_tx = txn
             self._detail_panel.update(txn)
+            self._btn_save.config(
+                state=tk.NORMAL if self._db.is_connected else tk.DISABLED
+            )
 
     def _on_load_db(self) -> None:
-        messagebox.showinfo("Load from DB", "Not yet implemented.")
+        dlg = DBConfigDialog(self, initial=self._db_config)
+        if dlg.result is None:
+            return  # user cancelled
+
+        host, port, user, password, database = dlg.result
+        self._db_config = {
+            "host": host, "port": str(port),
+            "user": user, "password": password, "database": database,
+        }
+
+        try:
+            self._db.connect(host, port, user, password, database)
+        except DBError as exc:
+            messagebox.showerror("Connection Failed", str(exc))
+            return
+
+        try:
+            transactions = self._db.load_all()
+        except DBError as exc:
+            messagebox.showerror("Load Failed", str(exc))
+            return
+
+        self._populate_table(transactions)
+        messagebox.showinfo(
+            "Loaded",
+            f"Loaded {len(transactions)} transaction(s) from {database}@{host}.",
+        )
+
+    def _on_save_one(self) -> None:
+        if self._selected_tx is None:
+            return
+        try:
+            inserted = self._db.save(self._selected_tx)
+        except DBError as exc:
+            messagebox.showerror("Save Failed", str(exc))
+            return
+        action = "Inserted" if inserted else "Updated"
+        messagebox.showinfo("Saved", f"{action} transaction in the database.")
 
     def _on_import_file(self) -> None:
         filepath = filedialog.askopenfilename(

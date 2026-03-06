@@ -12,9 +12,12 @@ class MainWindow(tk.Tk):
     """Main application window for the personal finance manager."""
 
     COLUMN_DEFS = [
-        ("date",        "Date",        120, "center"),
-        ("description", "Description", 280, "w"),
-        ("amount",      "Amount",      110, "e"),
+        ("date",             "Date",         120, "center"),
+        ("description",      "Description",  220, "w"),
+        ("counterparty_name","Counterparty",  180, "w"),
+        ("amount",           "Amount",        110, "e"),
+        ("currency",         "Currency",       60, "center"),
+        ("transaction_type", "Type",          140, "w"),
     ]
 
     def __init__(self):
@@ -130,7 +133,14 @@ class MainWindow(tk.Tk):
             item_id = self._tree.insert(
                 "",
                 "end",
-                values=(txn.date.strftime("%Y-%m-%d"), txn.description, amount_str),
+                values=(
+                    txn.date.strftime("%Y-%m-%d"),
+                    txn.description,
+                    txn.counterparty_name,
+                    amount_str,
+                    txn.currency,
+                    txn.transaction_type,
+                ),
                 tags=tags,
             )
             self._transactions[item_id] = txn
